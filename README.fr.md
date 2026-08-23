@@ -1,4 +1,4 @@
-﻿[🇬🇧 Read in English](README.md) | **🇫🇷 Lire en Français**
+[🇬🇧 Read in English](README.md) | **🇫🇷 Lire en Français**
 
 # Begonia Fleet Tool 🚀
 
@@ -250,7 +250,7 @@ pip install -r requirements.txt
 1. Lancez **`2_RESTAURER_STOCK_EEA_UNBRICK.bat`**.
 2. Téléphone éteint : Maintenez **[VOLUME HAUT] + [VOLUME BAS]** et branchez le câble USB-C.
 3. Dès que le flash démarre, relâchez les boutons.
-4. Le script écrit les 29 partitions officielles d'usine (durée : 2 à 4 minutes). Le téléphone redémarre sur une base saine.
+4. Le script écrit les 29 partitions officielles d'usine (durée : ~20 à 25 minutes). Le téléphone redémarre sur une base saine.
 
 ---
 
@@ -285,7 +285,7 @@ pip install -r requirements.txt
 7. **`Wipe`** ➔ Cliquer sur **`Format Data`** ➔ Taper **`yes`** *(Détruit le chiffrement matériel résiduel et formate le stockage à neuf)*.
 8. **`Reboot`** ➔ **`System`**.
 
-🎉 **Le téléphone démarre sous PixelExperience Plus 13 (Android 13), rooté avec Magisk, non chiffré et prêt pour votre MDM !**
+🎉 **Le téléphone démarre sous PixelExperience Plus 13 (Android 13), rooté avec Magisk et non chiffré !**
 
 ---
 
@@ -302,7 +302,7 @@ Le débriquage intégral réinjecte l'intégralité de la ROM stock officielle *
 2. Éteignez le téléphone complètement (maintenez `POWER` 10 à 15 secondes).
 3. Maintenez `[VOLUME HAUT] + [VOLUME BAS]` et branchez le câble USB-C au PC.
 4. Dès que les barres de progression apparaissent à l'écran, relâchez les boutons.
-5. Le flash des **29 partitions d'usine** prend environ **3 à 5 minutes**.
+5. Le flash des **29 partitions d'usine** prend environ **20 à 25 minutes**.
 6. Le téléphone redémarre automatiquement sur une base MIUI saine.
 
 ### Partitions Réinitialisées
