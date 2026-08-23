@@ -1,0 +1,5 @@
+﻿# Begonia Fleet Tool — Dependances Python
+# Installe les dependances de mtkclient (moteur BootROM).
+# Executer : pip install -r requirements.txt
+
+-r src/mtkclient/requirements.txt

@@ -1,0 +1,40 @@
+﻿# =====================================================================
+# Begonia Fleet Tool - .gitignore
+# =====================================================================
+
+# Dossier d'archives et anciens scripts non utilises
+OLD/
+*.old
+*.bak
+
+# Fichiers binaires et ROMs — heberges sur GitHub Releases
+# Telechargez les fichiers necessaires depuis la section Releases du depot.
+roms/*.zip
+roms/*.img
+recovery/*.img
+stock_firmware/images/
+
+# Archives volumineuses et sauvegardes locales
+*.tgz
+*.tar.gz
+*.7z
+backup_nvram_*/
+
+# Fichiers temporaires Python et caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+src/mtkclient/__pycache__/
+
+# Logs et sorties d'execution locales
+*.log
+logs/
+.system_generated/
+
+# Configuration IDE et OS
+.vscode/
+.idea/
+Thumbs.db
+Desktop.ini
+.DS_Store

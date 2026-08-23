@@ -1,0 +1,58 @@
+﻿name: CI - Linting & Link Check
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  lint-powershell:
+    name: Lint PowerShell (PSScriptAnalyzer)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PSScriptAnalyzer
+        shell: pwsh
+        run: Install-Module -Name PSScriptAnalyzer -Force -Scope CurrentUser
+      - name: Run PSScriptAnalyzer
+        shell: pwsh
+        run: |
+          $results = Invoke-ScriptAnalyzer -Path . -Recurse -Severity Error
+          if ($results) { $results | Format-Table -AutoSize; exit 1 }
+          Write-Host "No PowerShell errors detected."
+
+  lint-python:
+    name: Lint Python (Ruff)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - run: pip install ruff
+      - run: ruff check src/flash_stock_complete.py
+
+  check-markdown-links:
+    name: Check Markdown Links
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: gaurav-nelson/github-action-markdown-link-check@v1
+        with:
+          use-quiet-mode: "yes"
+
+  check-large-files:
+    name: Check No Large Binaries Committed
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for files > 50MB
+        run: |
+          LARGE=$(find . -not -path "./.git/*" -size +50M)
+          if [ -n "$LARGE" ]; then
+            echo "Large files detected:"
+            echo "$LARGE"
+            exit 1
+          fi
+          echo "No large files committed."
