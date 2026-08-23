@@ -21,5 +21,5 @@ Format : [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/)
 - begonia_tool.ps1 : Menu interactif PowerShell avec diagnostic d'environnement
 - src/flash_stock_complete.py : Orchestrateur Python avec protection anti-brick
 - SECURITY.md, CONTRIBUTING.md, CHANGELOG.md
-- README bilingue FR/EN (README.md + README.en.md)
+- README bilingue (README.md en anglais par défaut + README.fr.md en français)
 - Workflow CI/CD GitHub Actions (.github/workflows/linting.yml)
