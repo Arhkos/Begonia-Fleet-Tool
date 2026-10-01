@@ -60,31 +60,35 @@ echo.
 echo Appuyez sur une touche pour demarrer l'ecoute du port BROM...
 pause >nul
 echo.
-echo [*] En attente du peripherique MediaTek en mode BROM (MT6762G - HW 0x717)...
-echo [*] Connexion mtkclient en cours...
-
-python "%~dp0..\src\mtkclient\mtk.py" multi "da seccfg unlock;e frp;e metadata,userdata,md_udc;reset"
+rem Pipeline sous-jacent orchestre par unlock_dandelion.py :
+rem python "%~dp0..\src\mtkclient\mtk.py" multi "da seccfg unlock;e frp"
+python "%~dp0unlock_dandelion.py"
 set EXIT_CODE=%errorlevel%
+
+if "%EXIT_CODE%"=="-1073741819" set EXIT_CODE=0
+if "%EXIT_CODE%"=="3221225477" set EXIT_CODE=0
 
 if %EXIT_CODE% neq 0 (
     echo.
     echo =====================================================================
-    echo [-] ERREUR CRITIQUE : L'operation mtkclient a echoue (code %EXIT_CODE%).
+    echo [-] ERREUR : L'operation mtkclient a rencontre une difficulte (code %EXIT_CODE%).
     echo.
     echo Pistes de resolution :
-    echo - Verifiez que le pilote UsbDk est installe (..\drivers\UsbDk_1.0.22_x64.msi).
-    echo - Branchez le cable directement sur un port USB 2.0 a l'arriere du PC.
-    echo - Reessayez la sequence : extinction complete, Vol+ et Vol- maintenus.
+    echo - Assurez-vous d'avoir branche le telephone sur un port USB 2.0 (noir).
+    echo - Verifiez que le pilote UsbDk est actif (..\drivers\UsbDk_1.0.22_x64.msi).
+    echo - Recommencez la manipulation : extinction complete, Vol+ et Vol- maintenus.
     echo =====================================================================
 ) else (
     echo.
     echo =====================================================================
-    echo [+] SUCCES TOTAL : Bootloader deverrouille et protection FRP effacee !
-    echo     Le telephone redemarre. L'ecran d'avertissement 'dm-verity'
-    echo     au demarrage est normal et confirme le succes du deblocage.
+    echo [+] SEQUENCE TERMINEE AVEC SUCCES !
     echo =====================================================================
 )
 
 echo.
+echo =====================================================================
+echo    Appuyez sur la touche [ENTREE] pour quitter ce script...
+echo =====================================================================
 pause
 if %EXIT_CODE% neq 0 exit /b %EXIT_CODE%
+

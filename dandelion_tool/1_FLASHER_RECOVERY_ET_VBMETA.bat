@@ -61,7 +61,7 @@ echo Appuyez sur une touche pour lancer le flash de VBMeta et du Recovery...
 pause >nul
 echo.
 
-echo [*] Etape 1/2 : Desactivation de la verification AVB 2.0 (VBMeta)...
+echo [*] Etape 1/3 : Desactivation de la verification AVB 2.0 (VBMeta)...
 "%~dp0..\bin\fastboot.exe" --disable-verity --disable-verification flash vbmeta "%~dp0recovery\vbmeta.img"
 if %errorlevel% neq 0 (
     echo.
@@ -70,10 +70,28 @@ if %errorlevel% neq 0 (
     pause
     exit /b %errorlevel%
 )
-echo [+] VBMeta flashe et AVB desactive avec succes !
+if exist "%~dp0recovery\vbmeta_system.img" (
+    echo [*] Flash de vbmeta_system...
+    "%~dp0..\bin\fastboot.exe" flash vbmeta_system "%~dp0recovery\vbmeta_system.img"
+)
+if exist "%~dp0recovery\vbmeta_vendor.img" (
+    echo [*] Flash de vbmeta_vendor...
+    "%~dp0..\bin\fastboot.exe" flash vbmeta_vendor "%~dp0recovery\vbmeta_vendor.img"
+)
+echo [+] VBMeta et partitions AVB flashees avec succes !
 echo.
 
-echo [*] Etape 2/2 : Flash du Custom Recovery (recovery.img)...
+if exist "%~dp0recovery\boot.img" (
+    echo [*] Etape 2/3 : Flash du noyau certifie (boot.img ^& dtbo.img)...
+    "%~dp0..\bin\fastboot.exe" flash boot "%~dp0recovery\boot.img"
+    if exist "%~dp0recovery\dtbo.img" (
+        "%~dp0..\bin\fastboot.exe" flash dtbo "%~dp0recovery\dtbo.img"
+    )
+    echo [+] Noyau et DTBO synchronises avec succes !
+    echo.
+)
+
+echo [*] Etape 3/3 : Flash du Custom Recovery (recovery.img)...
 "%~dp0..\bin\fastboot.exe" flash recovery "%~dp0recovery\recovery.img"
 if %errorlevel% neq 0 (
     echo.

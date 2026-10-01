@@ -1,4 +1,4 @@
-﻿# =====================================================================
+# =====================================================================
 # Begonia Fleet Tool - .gitignore
 # =====================================================================
 
@@ -7,25 +7,40 @@ OLD/
 *.old
 *.bak
 
-# Fichiers binaires et ROMs — heberges sur GitHub Releases
-# Telechargez les fichiers necessaires depuis la section Releases du depot.
+# ROMs volumineuses (> 100 Mo) — hebergees sur GitHub Releases
 roms/*.zip
 roms/*.img
-recovery/*.img
+**/roms/*.zip
+**/roms/*.img
 stock_firmware/images/
+
+# Sauvegardes locales et dumps memoire
+backup/
+backup_*/
+**/backup/
+dandelion_tool/backup/
+
+# Fichiers temporaires d'execution, captures et etats locaux
+dandelion_tool/.state
+dandelion_tool/hwparam.json
+dandelion_tool/magisk_su_tab.xml
+dandelion_tool/screen.png
+*.png
+*.xml
+.state
+hwparam.json
 
 # Archives volumineuses et sauvegardes locales
 *.tgz
 *.tar.gz
 *.7z
-backup_nvram_*/
 
 # Fichiers temporaires Python et caches
 __pycache__/
 *.py[cod]
 *$py.class
 .pytest_cache/
-src/mtkclient/__pycache__/
+src/mtkclient/
 
 # Logs et sorties d'execution locales
 *.log

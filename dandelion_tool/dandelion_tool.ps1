@@ -131,7 +131,7 @@ function Unlock-And-FRP {
     Read-Host "Appuyez sur Entree quand pret..."
 
     Write-Host "[*] Interception du handshake BootROM en cours (session mtkclient multi)..." -ForegroundColor Yellow
-    & python "$mtkPy" multi "da seccfg unlock;e frp;e metadata,userdata,md_udc;reset"
+    & python "$mtkPy" multi "da seccfg lock;da seccfg unlock;e frp;e metadata,userdata,md_udc;reset"
 
     if ($LASTEXITCODE -eq 0) {
         Write-Host "[+] Operation terminee avec succes ! Bootloader deverrouille et FRP efface." -ForegroundColor Green

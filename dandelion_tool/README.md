@@ -77,55 +77,81 @@ peaceful-babbage/
 
 ## 5. Déroulement Chronologique du Pipeline (Étapes 0 à 4)
 
+## 5. Déroulement Chronologique du Pipeline (Éprouvé et Validé)
+
 ### Étape 0 : Installation du Pilote UsbDk
-- **Script :** Option `[1]` de `MENU_DANDELION.bat` ou double-clic sur `..\drivers\UsbDk_1.0.22_x64.msi`.
-- **Utilité :** Le pilote Red Hat / Daynix UsbDk permet à `libusb-1.0` de capturer directement le port USB en mode BootROM sans écraser les pilotes de ports COM de Windows.
+- **Action :** Exécuter `..\drivers\UsbDk_1.0.22_x64.msi` (installateur Red Hat / Daynix).
+- **Utilité :** Capture directe du contrôleur USB pour le handshake BROM de MediaTek via `libusb-1.0`.
 
-### Étape 1 : Déverrouillage Bootloader & Bypass FRP (Mode BROM)
-- **Script :** `0_DEVERROUILLER_BOOTLOADER_DANDELION.bat` (ou option `[2]` du menu).
+### Étape 1 : Déverrouillage Bootloader & Bypass Matériel RPMB (Mode BROM)
+- **Script :** `0_DEVERROUILLER_BOOTLOADER_DANDELION.bat` (exécute `unlock_dandelion.py`).
+- **Problématique résolue :** Sur les Little Kernel récents (mai 2023+, `tokenversion: 2`), Xiaomi stocke une signature magic `Jz8PNRUF` dans la zone **RPMB** de l'eMMC. Même après un `seccfg unlock`, le bootloader restaurait `unlocked: no` (`lks = 1`) au démarrage.
 - **Protocole :**
-  1. Éteindre le téléphone (maintenir `POWER` 10 à 15 secondes).
-  2. Maintenir `[VOLUME HAUT]` + `[VOLUME BAS]`.
-  3. Brancher le câble USB relié au PC.
-  4. Dès le premier message mtkclient, relâcher les boutons.
-- **Commande atomique exécutée :**
-  ```cmd
-  python "..\src\mtkclient\mtk.py" multi "da seccfg unlock;e frp;e metadata,userdata,md_udc;reset"
-  ```
-- **Résultat :** Partition `seccfg` réécrite en mode déverrouillé (`lock_state = 0x03`), partition `frp` formatée (verrou de compte Google supprimé), partitions de chiffrement vidées, et réinitialisation de l'appareil.
+  1. Éteindre complètement le téléphone (`POWER` 10 à 15s).
+  2. Lancer le script d'écoute BROM.
+  3. Maintenir fermement `[VOLUME HAUT]` + `[VOLUME BAS]` et brancher le câble USB (port USB 2.0 de préférence).
+  4. Relâcher les boutons dès la détection.
+- **Actions automatisées par `unlock_dandelion.py` :**
+  - Sauvegarde de sécurité de la partition `lk` et lecture de la `RPMB` (1 Mo / 16 Mo).
+  - Détection automatique de la signature `Jz8PNRUF` à l'offset `0xE00000` (secteur 57344).
+  - Effacement ciblé des 4 secteurs magic RPMB (1024 octets) et re-lecture de vérification (confirmée à 0x00).
+  - Écriture du déverrouillage `seccfg` (`ATTR_UNLOCK`).
+  - Formatage sécurisé des partitions `frp`, `metadata`, `userdata`, `md_udc`.
+  - Redémarrage et vérification immédiate :
+    ```cmd
+    fastboot getvar unlocked   -> unlocked: yes
+    fastboot oem lks           -> lks = 0
+    ```
 
-### Étape 2 : Flash du Custom Recovery & Neutralisation AVB (Mode Fastboot)
-- **Script :** `1_FLASHER_RECOVERY_ET_VBMETA.bat` (ou option `[3]` du menu).
-- **Protocole :**
-  1. Démarrer en mode Fastboot en maintenant `[VOLUME BAS]` + `[POWER]`.
-  2. Brancher le câble USB.
-  3. Lancer le script.
+### Étape 2 : Extraction et Flash des Images Certifiées crDroid (Mode Fastboot)
+- **Script :** `flash_crdroid_recovery.bat` (ou commandes manuelles).
+- **Origine des images :** L'archive officielle de la ROM (`crDroidAndroid-*-blossom-*.zip`) contient directement dans son zip les images certifiées et synchronisées avec le noyau :
+  - `recovery.img` (Recovery officiel crDroid pour blossom)
+  - `boot.img` & `dtbo.img` (Noyau 64-bit et arbre de périphériques)
+  - `vbmeta.img`, `vbmeta_system.img`, `vbmeta_vendor.img` (avec AVB désactivé `flags=0x3`)
 - **Commandes Fastboot exécutées :**
   ```cmd
-  ..\bin\fastboot.exe --disable-verity --disable-verification flash vbmeta "recovery\vbmeta.img"
-  ..\bin\fastboot.exe flash recovery "recovery\recovery.img"
+  ..\bin\fastboot.exe --disable-verity --disable-verification flash vbmeta "recovery\crdroid\vbmeta.img"
+  ..\bin\fastboot.exe flash vbmeta_system "recovery\crdroid\vbmeta_system.img"
+  ..\bin\fastboot.exe flash vbmeta_vendor "recovery\crdroid\vbmeta_vendor.img"
+  ..\bin\fastboot.exe flash boot "recovery\crdroid\boot.img"
+  ..\bin\fastboot.exe flash dtbo "recovery\crdroid\dtbo.img"
+  ..\bin\fastboot.exe flash recovery "recovery\crdroid\recovery.img"
   ..\bin\fastboot.exe reboot recovery
   ```
-- **Protection anti-écrasement :** Le redémarrage immédiat vers le recovery (`reboot recovery`) empêche le script de démarrage stock MIUI `/system/bin/install-recovery.sh` d'écraser le custom recovery par le recovery d'usine.
 
-### Étape 3 : Déploiement Custom ROM 64-bit & Root Magisk
-- **Script :** `2_INSTALLER_ROM_64BIT_ET_ROOT.bat` (ou option `[4]` du menu).
-- **Actions dans le Recovery (OrangeFox / TWRP) :**
-  1. **Format Data (Impératif) :** `Wipe` > `Format Data` > taper `yes`. Supprime le chiffrement propriétaire MIUI.
-  2. **Copie automatique ADB :** Le script copie les archives `.zip` présentes dans `roms\` ainsi que `Magisk-v26.4.apk` (copié sous `/sdcard/Magisk-v26.4.zip`).
-  3. **Flash :** Installer la ROM 64-bit (`crDroidAndroid-13.0-blossom-OFFICIAL.zip` ou équivalent), puis installer `Magisk-v26.4.zip`.
-  4. **Reboot System :** Démarrer sous Android 13.
+### Étape 3 : Déploiement de la ROM crDroid via ADB Sideload
+- **Actions dans le Recovery crDroid :**
+  1. **Formatage préalable :** `Factory reset` > `Format data / factory reset` > valider `Format data`.
+  2. **Passage en mode Sideload :** `Apply update` > `Apply from ADB`.
+  3. **Transfert de la ROM depuis le PC :**
+     ```cmd
+     ..\bin\adb.exe sideload dandelion_tool\roms\crDroidAndroid-*-blossom-*.zip
+     ```
+  4. **Formatage userdata final (Anti-Bootloop) :**
+     Une fois le sideload terminé, reformater `userdata` (`Format data` dans le recovery ou `fastboot erase userdata` / `erase metadata`) pour que la table de chiffrement soit 100% propre pour la nouvelle ROM.
+  5. **Démarrage :** `Reboot system now`. Le téléphone démarre sur l'assistant de bienvenue crDroid.
 
-### Étape 4 : Vérification Finale du Système sous Android
-- **Script :** Option `[5]` du menu interactif ou phase de contrôle intégrée dans l'étape 2.
+### Étape 4 : Activation du Débogage USB & Root Magisk
+1. **Accès au bureau Android :** Passer l'assistant initial crDroid.
+2. **Débogage USB :**
+   - Paramètres > À propos du téléphone > tapoter 7 fois sur *Numéro de build*.
+   - Paramètres > Système > Options pour les développeurs > activer *Débogage USB*.
+   - Valider la popup « Toujours autoriser depuis cet ordinateur ».
+3. **Installation du Root :**
+   - Installer l'application Magisk v30+ :
+     ```cmd
+     ..\bin\adb.exe install dandelion_tool\roms\Magisk-v30.7.apk
+     ```
+   - Injecter le binaire root dans le noyau via Recovery (`adb reboot recovery` > `Apply from ADB` > `adb sideload Magisk-v30.7.zip`) ou via l'option native *Rooted debugging* de crDroid.
 
 ---
 
 ## 6. Commandes Exactes de Validation Système (ADB)
 
-Une fois le téléphone démarré et le **Débogage USB** activé dans les options pour développeurs :
+Une fois le téléphone démarré avec le Débogage USB actif :
 
-### 6.1 Validation de l'Architecture CPU 64-bit
+### 6.1 Validation de l'Architecture CPU 64-bit Native
 Exécuter :
 ```cmd
 ..\bin\adb.exe shell getprop ro.product.cpu.abi
@@ -134,7 +160,6 @@ Exécuter :
   ```
   arm64-v8a
   ```
-- **Critère de Rejet :** Si la commande retourne `armeabi-v7a`, le terminal fonctionne toujours avec la pile logicielle 32-bit d'origine.
 
 Vérification complémentaire du noyau Linux :
 ```cmd
@@ -151,23 +176,21 @@ Exécuter :
   ```
   uid=0(root) gid=0(root) groups=0(root)... context=u:r:magisk:s0
   ```
-- **Critère de Rejet :** Tout retour contenant `su: not found`, `Permission denied` ou un uid différent de 0 indique une absence de root opérationnel.
-
-Vérification de la version du démon Magisk :
-```cmd
-..\bin\adb.exe shell su -c "magisk -v"
-```
-- **Résultat Conforme :** `26.4:MAGISK`
 
 ---
 
-## 7. Dépannage & Cas Particuliers
+## 7. Dépannage & Retours d'Expérience Réels
 
-1. **Le téléphone démarre en boucle sur l'écran d'avertissement dm-verity :**
-   - Comportement normal après déverrouillage BROM. Appuyez une fois sur le bouton `POWER` pour poursuivre le démarrage, ou flashez `vbmeta.img` avec `--disable-verity --disable-verification`.
-2. **Le mode BROM ne se déclenche pas lors du branchement USB :**
-   - Assurez-vous que le téléphone est éteint à 100% (pas en veille). Maintenez `POWER` pendant 15 secondes.
-   - Branchez le câble USB directement sur les ports arrière de la carte mère (évitez les hubs USB et les façades de boîtier).
-   - Maintenez fermement `[VOLUME HAUT]` et `[VOLUME BAS]` **avant** et **pendant** l'insertion du câble.
-3. **Le tactile ne répond pas dans le Custom Recovery :**
-   - Le Redmi 10A utilise différents contrôleurs d'écran (Tianma, Huaxing, Novatek). La version de recovery incluse intègre les pilotes d'affichage multi-fournisseurs. Si un blocage survient, connectez une souris USB via un adaptateur OTG ou utilisez les touches physiques de volume pour naviguer.
+1. **Bootloader reste à `unlocked: no` après mtkclient :**
+   - **Cause :** Présence du magic RPMB à l'offset `0xE00000` (secteur 57344) vérifié par le Little Kernel.
+   - **Solution :** Utiliser `unlock_dandelion.py` qui efface automatiquement les 4 secteurs magic RPMB et applique `seccfg unlock` dans la même session BROM.
+2. **Le téléphone démarre sur le MIUI Recovery au lieu du Custom Recovery :**
+   - **Cause :** Noyau de recovery trop ancien (ex. build 2020 pour Android 10) ou absence des tables `vbmeta_system` / `vbmeta_vendor`.
+   - **Solution :** Flasher les images synchronisées extraites du zip crDroid (`vbmeta`, `vbmeta_system`, `vbmeta_vendor`, `boot`, `dtbo`, `recovery`).
+3. **Bootloop sur le logo MI après flash de la ROM :**
+   - **Cause :** Conflit de chiffrement sur la partition `userdata` ou tentative de patch avec une ancienne version de Magisk (v26) incompatible avec le format d'init d'Android 15/16.
+   - **Solution :** Flasher le `boot.img` propre crDroid, exécuter `fastboot erase userdata` et `erase metadata`, puis utiliser Magisk v30+ certifié pour Android 15/16.
+4. **Réinitialisation d'usine (Factory Reset) et persistance du Root :**
+   - **Comportement :** Une réinitialisation d'usine depuis les menus Android n'efface QUE la partition `userdata`. La partition `boot` contenant le patch Magisk au niveau du noyau demeure 100% intacte.
+   - **Résultat :** Le root est intégralement conservé. Le binaire `su` fonctionne toujours via ADB. Il suffit simplement de réinstaller l'application graphique via `adb install dandelion_tool\roms\Magisk-v30.7.apk` si l'interface utilisateur Magisk est souhaitée.
+

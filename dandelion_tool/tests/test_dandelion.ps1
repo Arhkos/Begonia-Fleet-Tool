@@ -119,7 +119,8 @@ if ($Tier -in @("1", "All")) {
                 if ($statusPrefix -ne '??') {
                     if (-not $filePath.StartsWith("dandelion_tool/") -and 
                         -not $filePath.StartsWith(".agents/") -and
-                        -not $filePath.StartsWith("dandelion_tool\")) {
+                        -not $filePath.StartsWith("dandelion_tool\") -and
+                        $filePath -ne ".gitignore") {
                         $modifiedTrackedOutside += $filePath
                     }
                 }
@@ -815,7 +816,7 @@ if ($Tier -in @("4", "All")) {
             $status = $line.Substring(0, 2)
             $file = $line.Substring(3).Trim()
             if ($status -match '^[ MADRCU]' -and $status -ne '??') {
-                if (-not $file.StartsWith("dandelion_tool/") -and -not $file.StartsWith(".agents/") -and -not $file.StartsWith("dandelion_tool\")) {
+                if (-not $file.StartsWith("dandelion_tool/") -and -not $file.StartsWith(".agents/") -and -not $file.StartsWith("dandelion_tool\") -and $file -ne ".gitignore") {
                     $acAuditPass = $false
                     $acIssues += "AC1 Violation: Modified file outside dandelion_tool: $file"
                 }

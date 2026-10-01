@@ -19,14 +19,17 @@ Le passage à une Custom ROM 64-bit unifiée de la famille **blossom** (Redmi 10
 
 ## 2. ROMs 64-bit Recommandées pour blossom / dandelion
 
-### Option A : crDroid 9.x ARM64 (Android 13) — Recommandé
-- **Nom du paquet :** `crDroidAndroid-13.0-blossom-OFFICIAL.zip`
-- **Architecture :** ARM64 (`arm64-v8a`)
-- **Version Android :** Android 13 (Tiramisu)
+### Option A : crDroid 8.x ARM64 (Android 12.1) — Recommandé pour le Minage
+- **Nom du paquet officiel :** `crDroidAndroid-12.1-*-blossom-OFFICIAL.zip`
+- **Architecture :** ARM64 (`arm64-v8a`) natif
+- **Version Android :** Android 12.1 / 12L (API 32)
 - **Famille cible :** Xiaomi blossom (`dandelion` / `angelica` / `angelican` / `cattail`)
 - **Portail officiel :** [https://crdroid.net/blossom](https://crdroid.net/blossom)
-- **Miroir SourceForge :** [https://sourceforge.net/projects/crdroid/files/blossom/](https://sourceforge.net/projects/crdroid/files/blossom/)
-- **Fonctionnalités :** Support multi-panneaux d'affichage (Tianma, Huaxing, Novatek), zRAM optimisée pour 3 Go de RAM, noyau Linux 4.9/4.19 64-bit unifié, compatibilité Magisk v26+.
+- **Miroir SourceForge officiel :** [https://sourceforge.net/projects/crdroid/files/blossom/12.x/](https://sourceforge.net/projects/crdroid/files/blossom/12.x/)
+- **Pourquoi cette version est idéale pour le minage sur 3 Go de RAM :**
+  - **Empreinte mémoire réduite :** Android 12 consomme ~300 à 400 Mo de RAM en moins qu'Android 13/14, libérant un maximum de mémoire vive pour les threads de calcul `ccminer` / `primo-arm-miner`.
+  - **Moins de restrictions d'arrière-plan :** Pas de *Phantom Process Killer* agressif comme introduit sous Android 13.
+  - **Compatibilité 64-bit totale :** Exécute nativement tous les binaires ELF `aarch64` avec support complet de Magisk v26+.
 
 ### Option B : LineageOS 20.0 ARM64 (Android 13)
 - **Nom du paquet :** `lineage-20.0-blossom-UNOFFICIAL.zip`
@@ -43,7 +46,7 @@ Le passage à une Custom ROM 64-bit unifiée de la famille **blossom** (Redmi 10
 | Paquet | Architecture | Taille approx. | SHA-256 Checksum |
 | :--- | :--- | :--- | :--- |
 | `Magisk-v26.4.apk` | Multi (ARM/ARM64/x86) | 12.52 Mo | `543a96fe26c012d99baf3a3aa5a97b80508d67cc641af7c12ce9f7b226b2b889` |
-| `crDroid-blossom-13.0.zip` (Official Build) | `arm64-v8a` | ~980 Mo | `c872d8a56f08e4271421b06da8d32b50428efcb9287c80ef4272ceb05c56c221` |
+| `crDroidAndroid-12.1-*-blossom-OFFICIAL.zip` | `arm64-v8a` | ~920 Mo | Vérifiable via `Get-FileHash` |
 | `lineage-20.0-blossom.zip` (Community Build) | `arm64-v8a` | ~890 Mo | `a391c53d0e3b624f923b7b257da4bf061e88d75cbce2a7fb488f72c050f2491b` |
 
 *Note : Pour vérifier la somme de contrôle d'un fichier téléchargé sous Windows PowerShell :*

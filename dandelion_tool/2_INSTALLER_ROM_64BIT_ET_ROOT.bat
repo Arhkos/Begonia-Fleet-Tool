@@ -57,11 +57,20 @@ if %ROM_COUNT% equ 0 (
 )
 
 rem Copie du paquet Magisk pour le root
-if exist "%~dp0roms\Magisk-v26.4.apk" (
-    echo [*] Copie de Magisk v26.4 vers /sdcard/Magisk-v26.4.zip ...
-    "%~dp0..\bin\adb.exe" push "%~dp0roms\Magisk-v26.4.apk" /sdcard/Magisk-v26.4.zip
+set "MAGISK_FILE="
+if exist "%~dp0roms\Magisk-v30.7.apk" (
+    set "MAGISK_FILE=%~dp0roms\Magisk-v30.7.apk"
+) else if exist "%~dp0roms\Magisk-v30.7.zip" (
+    set "MAGISK_FILE=%~dp0roms\Magisk-v30.7.zip"
+) else if exist "%~dp0roms\Magisk-v26.4.apk" (
+    set "MAGISK_FILE=%~dp0roms\Magisk-v26.4.apk"
+)
+
+if defined MAGISK_FILE (
+    echo [*] Copie de Magisk vers /sdcard/Magisk.zip ...
+    "%~dp0..\bin\adb.exe" push "%MAGISK_FILE%" /sdcard/Magisk.zip
     if %errorlevel% equ 0 (
-        echo [+] Magisk v26.4 copie avec succes sous /sdcard/Magisk-v26.4.zip !
+        echo [+] Magisk copie avec succes sous /sdcard/Magisk.zip !
     ) else (
         echo [-] Echec du transfert de Magisk via ADB.
     )
