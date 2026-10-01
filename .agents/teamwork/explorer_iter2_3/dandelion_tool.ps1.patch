@@ -1,0 +1,75 @@
+--- a/dandelion_tool/dandelion_tool.ps1
++++ b/dandelion_tool/dandelion_tool.ps1
+@@ -154,8 +154,16 @@ function Flash-Recovery-Fastboot {
+     Read-Host "Appuyez sur Entree quand pret..."
+ 
+     Write-Host "[*] Verification de la presence du peripherique Fastboot..." -ForegroundColor Yellow
+-    & "$fastbootExe" devices
++    $fbRaw = & "$fastbootExe" devices 2>&1
+     if ($LASTEXITCODE -ne 0) {
+         Write-Host "[-] Erreur d'execution de fastboot.exe." -ForegroundColor Red
+         return
+     }
++
++    $fbDevices = ($fbRaw | Out-String).Trim()
++    if ([string]::IsNullOrWhiteSpace($fbDevices)) {
++        Write-Host "[-] Aucun peripherique Fastboot detecte ! Connectez le telephone en mode Fastboot (VOLUME BAS + POWER)." -ForegroundColor Red
++        return
++    }
++    Write-Host "[+] Peripherique Fastboot detecte :" -ForegroundColor Green
++    Write-Host "    $fbDevices" -ForegroundColor Cyan
+ 
+     Write-Host "[*] Flash de vbmeta.img avec desactivation AVB 2.0 (dm-verity)..." -ForegroundColor Yellow
+@@ -213,6 +221,10 @@ function Push-ROM-Files-ADB {
+         & "$adbExe" push "$magiskApk" /sdcard/Magisk-v26.4.zip
+         if ($LASTEXITCODE -eq 0) {
+             Write-Host "[+] Magisk-v26.4.zip pret pour installation dans le recovery !" -ForegroundColor Green
++        } else {
++            Write-Host "[-] ERREUR lors de l'envoi de Magisk-v26.4.apk (code $LASTEXITCODE)." -ForegroundColor Red
+         }
++    } else {
++        Write-Host "[-] Fichier Magisk introuvable : $magiskApk" -ForegroundColor Red
+     }
+ 
+     Write-Host ""
+@@ -237,7 +249,8 @@ function Verify-System-ADB {
+ 
+     # 1. Verification de l'architecture
+     Write-Host "[1/2] Controle de l'architecture (ro.product.cpu.abi)..." -ForegroundColor Yellow
+-    $abi = (& "$adbExe" shell getprop ro.product.cpu.abi).Trim()
++    $abiRaw = & "$adbExe" shell getprop ro.product.cpu.abi 2>&1
++    $abi = ($abiRaw | Out-String).Trim()
+     Write-Host "      Valeur lue : $abi" -ForegroundColor White
+ 
+     if ($abi -eq "arm64-v8a") {
+@@ -250,7 +263,8 @@ function Verify-System-ADB {
+     # 2. Verification de l'acces root
+     Write-Host ""
+     Write-Host "[2/2] Controle des privileges Root (su -c 'id')..." -ForegroundColor Yellow
+-    $rootOutput = (& "$adbExe" shell su -c "id" 2>&1).Trim()
++    $rootRaw = & "$adbExe" shell su -c "id" 2>&1
++    $rootOutput = ($rootRaw | Out-String).Trim()
+     Write-Host "      Reponse de l'invite root : $rootOutput" -ForegroundColor White
+ 
+     if ($rootOutput -match "uid=0\(root\)") {
+@@ -294,13 +308,17 @@ function Show-Menu {
+ }
+ 
+ # Routage des actions selon le parametre $Action
+-switch ($Action.ToLower()) {
++$actionNorm = if ([string]::IsNullOrWhiteSpace($Action)) { "menu" } else { $Action.Trim().ToLower() }
++switch ($actionNorm) {
+     "menu"           { Show-Menu }
+     "check"          { Check-Environment }
+     "env"            { Check-Environment }
+     "install-usbdk"  { Install-UsbDk-Driver }
+     "unlock"         { Unlock-And-FRP }
+     "recovery"       { Flash-Recovery-Fastboot }
+     "deploy-rom"     { Push-ROM-Files-ADB }
+     "verify"         { Verify-System-ADB }
+-    Default          { Show-Menu }
++    Default {
++        Write-Host "[-] Action invalide : '$Action'. Actions valides : menu, check, env, install-usbdk, unlock, recovery, deploy-rom, verify." -ForegroundColor Red
++        exit 1
++    }
+ }
