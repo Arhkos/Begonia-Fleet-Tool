@@ -23,83 +23,153 @@ echo =====================================================================
 echo.
 
 echo ETAPE A : DETECTION DU PERIPHERIQUE EN RECOVERY
-echo  1. Assurez-vous que le telephone est demarre en Custom Recovery (OrangeFox/TWRP).
-echo  2. Branchez le cable USB au PC.
-echo  3. Dans le recovery, allez dans 'Mount' : si necessaire, desactivez puis
-echo     reactivez MTP pour rafraichir le pont USB ADB.
+echo  - Dans le Recovery crDroid :
+echo    1. Formatage prealable [si transition MIUI stock] :
+echo       Allez dans 'Factory reset' ^> 'Format data / factory reset' ^> valider 'Format data'.
+echo    2. Passage en mode Sideload :
+echo       Allez dans 'Apply update' ^> 'Apply from ADB'.
+echo  - Reliez le cable USB au PC.
 echo.
 echo Verification des peripheriques ADB connectes...
 "%~dp0..\bin\adb.exe" devices
 echo.
 
-set /p CHOIX_ETAPE="Voulez-vous (1) Copier les fichiers ROM/Root, ou (2) Verifier directement l'architecture/Root ? [1/2] : "
-if "%CHOIX_ETAPE%"=="2" goto VERIFICATION_SYSTEME
+set "ADB_STATE=non_detecte"
+for /f "tokens=*" %%s in ('"%~dp0..\bin\adb.exe" get-state 2^>nul') do set "ADB_STATE=%%s"
+echo [+] Etat de la connexion ADB detecte : %ADB_STATE%
+echo.
+
+rem Recherche de la ROM dans roms\ [en excluant les archives Magisk]
+set "ROM_FILE="
+set "ROM_NAME="
+for %%f in ("%~dp0roms\*.zip") do (
+    echo "%%~nxf" | findstr /i /v "Magisk" >nul
+    if not errorlevel 1 (
+        set "ROM_FILE=%%f"
+        set "ROM_NAME=%%~nxf"
+    )
+)
+
+rem Detection du paquet Magisk pour le root
+set "MAGISK_FILE="
+set "MAGISK_NAME="
+if exist "%~dp0roms\Magisk-v30.7.zip" (
+    set "MAGISK_FILE=%~dp0roms\Magisk-v30.7.zip"
+    set "MAGISK_NAME=Magisk-v30.7.zip"
+) else if exist "%~dp0roms\Magisk-v30.7.apk" (
+    set "MAGISK_FILE=%~dp0roms\Magisk-v30.7.apk"
+    set "MAGISK_NAME=Magisk-v30.7.apk"
+) else if exist "%~dp0roms\Magisk-v26.4.apk" (
+    set "MAGISK_FILE=%~dp0roms\Magisk-v26.4.apk"
+    set "MAGISK_NAME=Magisk-v26.4.apk"
+) else if exist "%~dp0roms\Magisk-v26.4.zip" (
+    set "MAGISK_FILE=%~dp0roms\Magisk-v26.4.zip"
+    set "MAGISK_NAME=Magisk-v26.4.zip"
+)
+
+echo Options disponibles :
+echo  [1] Installer la ROM 64-bit [Sideload automatique ou Push]
+echo  [2] Installer le Root Magisk [Sideload dans le Recovery]
+echo  [3] Verifier l'architecture 64-bit et le Root [apres demarrage Android]
+echo.
+set /p CHOIX_ETAPE="Votre choix [1/2/3] (defaut=1) : "
+if "%CHOIX_ETAPE%"=="2" goto FLASH_MAGISK
+if "%CHOIX_ETAPE%"=="3" goto VERIFICATION_SYSTEME
 
 :COPIE_FICHIERS
 echo.
 echo =====================================================================
-echo    ETAPE B : TRANSFERT DES FICHIERS VERS LE RECOVERY (/sdcard/)
+echo    ETAPE B : INSTALLATION DE LA CUSTOM ROM 64-BIT
 echo =====================================================================
 echo.
 
-rem Recherche de paquets ROM dans roms\
-set ROM_COUNT=0
-for %%f in ("%~dp0roms\*.zip") do (
-    set /a ROM_COUNT+=1
-    echo [*] Copie de la ROM detectee : "%%~nxf" ...
-    "%~dp0..\bin\adb.exe" push "%%f" /sdcard/
-)
-
-if %ROM_COUNT% equ 0 (
+if not defined ROM_FILE (
     echo [!] Aucune archive ROM .zip detectee dans .\roms\.
-    echo     Consultez .\roms\README_ROMS.md pour telecharger crDroid 9 ou LineageOS 20.
-    echo     Vous pouvez copier l'archive .zip de votre choix dans .\roms\ a tout moment.
+    echo     Consultez .\roms\README_ROMS.md pour telecharger crDroid ou LineageOS.
+    pause
+    goto FIN
 )
 
-rem Copie du paquet Magisk pour le root
-set "MAGISK_FILE="
-if exist "%~dp0roms\Magisk-v30.7.apk" (
-    set "MAGISK_FILE=%~dp0roms\Magisk-v30.7.apk"
-) else if exist "%~dp0roms\Magisk-v30.7.zip" (
-    set "MAGISK_FILE=%~dp0roms\Magisk-v30.7.zip"
-) else if exist "%~dp0roms\Magisk-v26.4.apk" (
-    set "MAGISK_FILE=%~dp0roms\Magisk-v26.4.apk"
-)
+echo [*] ROM detectee : "%ROM_NAME%"
+echo.
 
-if defined MAGISK_FILE (
-    echo [*] Copie de Magisk vers /sdcard/Magisk.zip ...
-    "%~dp0..\bin\adb.exe" push "%MAGISK_FILE%" /sdcard/Magisk.zip
-    if %errorlevel% equ 0 (
-        echo [+] Magisk copie avec succes sous /sdcard/Magisk.zip !
+if "%ADB_STATE%"=="sideload" (
+    echo [+] Peripherique detecte en mode ADB SIDELOAD !
+    echo [*] Demarrage du transfert via 'adb sideload' [patientez environ 1 a 2 minutes]...
+    "%~dp0..\bin\adb.exe" sideload "%ROM_FILE%"
+    if errorlevel 1 (
+        echo.
+        echo [-] Echec du transfert ADB Sideload.
     ) else (
-        echo [-] Echec du transfert de Magisk via ADB.
+        echo.
+        echo [+] TRANSFERT DE LA ROM CRDROID TERMINE AVEC SUCCES !
+    )
+) else (
+    echo [*] Envoi de la ROM vers /sdcard/ via ADB Push...
+    "%~dp0..\bin\adb.exe" push "%ROM_FILE%" /sdcard/
+    if errorlevel 1 (
+        echo.
+        echo [!] La copie Push n'a pas pu aboutir.
+        echo     Dans le Recovery crDroid, passez en mode Sideload :
+        echo     'Apply update' ^> 'Apply from ADB', puis relancez ce script [Option 1].
+    ) else (
+        echo [+] Copie terminee avec succes sur /sdcard/ !
     )
 )
 
 echo.
 echo =====================================================================
-echo    INSTRUCTIONS DANS LE RECOVERY DU REDMI 10A :
+echo    INSTRUCTIONS FINALES DANS LE RECOVERY CRDROID :
 echo =====================================================================
-echo  1. Formatage initial (OBLIGATOIRE si transition depuis stock MIUI) :
-echo     - Allez dans 'Wipe' ^> 'Format Data'
-echo     - Tapez 'yes' et validez (supprime le chiffrement materiel)
+echo  1. Root Magisk immediat [optionnel] :
+echo     - Si le Recovery demande 'Install additional packages', choisissez 'Yes'.
+echo     - Ou revenez au menu principal : 'Apply update' ^> 'Apply from ADB'
+echo       puis relancez ce script en choisissant l'Option 2 [Magisk].
+echo     - Si le message 'Signature verification failed. Install anyway?' s'affiche :
+echo       Selectionnez 'Yes' [comportement standard pour Magisk].
 echo.
-echo  2. Installation de la Custom ROM :
-echo     - Allez dans 'Install' ^> selectionnez le fichier .zip de la ROM
-echo     - Glissez pour confirmer le flash
+echo  2. Formatage des donnees utilisateur [Anti-bootloop si premiere installation] :
+echo     - Allez dans 'Factory reset' ^> 'Format data / factory reset'.
 echo.
-echo  3. Installation du Root 64-bit :
-echo     - Allez dans 'Install' ^> selectionnez '/sdcard/Magisk-v26.4.zip'
-echo     - Glissez pour confirmer le flash
-echo.
-echo  4. Redemarrage :
-echo     - Cliquez sur 'Reboot System'
-echo     - Laissez le telephone demarrer (premier boot : 2 a 3 minutes)
+echo  3. Redemarrage :
+echo     - Selectionnez 'Reboot system now'.
+echo     - Laissez demarrer [premier boot : 2 a 3 minutes].
 echo =====================================================================
 echo.
+set /p DEMANDE_MAGISK="Voulez-vous flasher Magisk maintenant en mode Sideload ? (O/N) : "
+if /i "%DEMANDE_MAGISK%"=="O" goto FLASH_MAGISK
+goto FIN
 
-set /p LANCER_VERIF="Une fois le telephone demarre sur Android avec debogage USB active, passer aux verifications ? (O/N) : "
-if /i not "%LANCER_VERIF%"=="O" goto FIN
+:FLASH_MAGISK
+echo.
+echo =====================================================================
+echo    FLASH DU PAQUET ROOT MAGISK [MODE SIDELOAD]
+echo =====================================================================
+echo.
+if not defined MAGISK_FILE (
+    echo [-] Paquet Magisk introuvable dans .\roms\.
+    pause
+    goto FIN
+)
+
+echo Assurez-vous que le telephone est sur l'ecran 'Apply from ADB' [Sideload].
+echo Fichier Magisk cible : "%MAGISK_NAME%"
+echo.
+pause
+
+echo [*] Envoi de Magisk via ADB Sideload...
+"%~dp0..\bin\adb.exe" sideload "%MAGISK_FILE%"
+if errorlevel 1 (
+    echo [-] Echec du flash de Magisk.
+) else (
+    echo [+] Magisk injecte avec succes !
+)
+echo.
+echo [!] NOTE : Si le Recovery affiche "Signature verification failed. Install anyway?",
+echo     selectionnez "Yes" sur l'ecran du telephone.
+echo.
+pause
+goto FIN
 
 :VERIFICATION_SYSTEME
 echo.
@@ -117,7 +187,7 @@ for /f "tokens=*" %%a in ('"%~dp0..\bin\adb.exe" shell getprop ro.product.cpu.ab
 
 echo     Valeur retournee par l'OS : %CURRENT_ABI%
 if /i "%CURRENT_ABI%"=="arm64-v8a" (
-    echo [+] VALIDATION CONFORME : Le systeme tourne bien en 64-bit natif (arm64-v8a) !
+    echo [+] VALIDATION CONFORME : Le systeme tourne bien en 64-bit natif [arm64-v8a] !
 ) else (
     echo [-] ATTENTION : Valeur non attendue. Recu '%CURRENT_ABI%' au lieu de 'arm64-v8a'.
     echo     Verifiez que la Custom ROM 64-bit a ete correctement installee.
@@ -131,7 +201,7 @@ for /f "tokens=*" %%b in ('call "%~dp0..\bin\adb.exe" shell su -c id 2^>nul') do
 echo     Reponse de la commande : %ROOT_OUTPUT%
 echo "%ROOT_OUTPUT%" | findstr /c:"uid=0(root)" >nul
 if %errorlevel% equ 0 (
-    echo [+] VALIDATION CONFORME : Privileges root obtenus avec succes (uid=0) !
+    echo [+] VALIDATION CONFORME : Privileges root obtenus avec succes [uid=0] !
 ) else (
     echo [-] ATTENTION : Privilege root non detecte ou demande refusee.
     echo     Verifiez que l'application Magisk est installee et que le superutilisateur est autorise.

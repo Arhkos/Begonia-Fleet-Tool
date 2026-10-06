@@ -19,9 +19,13 @@ $mtkPy       = "$WorkspaceRoot\src\mtkclient\mtk.py"
 $usbdkMsi    = "$WorkspaceRoot\drivers\UsbDk_1.0.22_x64.msi"
 
 # Fichiers dedies au module dandelion_tool
-$recImg      = "$ScriptDir\recovery\recovery.img"
-$vbmetaImg   = "$ScriptDir\recovery\vbmeta.img"
-$magiskApk   = "$ScriptDir\roms\Magisk-v26.4.apk"
+$unlockPy      = "$ScriptDir\unlock_dandelion.py"
+$recImg        = "$ScriptDir\recovery\recovery.img"
+$vbmetaImg     = "$ScriptDir\recovery\vbmeta.img"
+$vbmetaSysImg  = "$ScriptDir\recovery\vbmeta_system.img"
+$vbmetaVenImg  = "$ScriptDir\recovery\vbmeta_vendor.img"
+$bootImg       = "$ScriptDir\recovery\boot.img"
+$dtboImg       = "$ScriptDir\recovery\dtbo.img"
 
 function Show-Header {
     Clear-Host
@@ -50,7 +54,7 @@ function Check-Environment {
         $pyVersion = python --version 2>&1
         Write-Host "[+] Environnement Python detecte : $pyVersion" -ForegroundColor Green
     } catch {
-        Write-Host "[-] Python non detecte dans le PATH." -ForegroundColor Red
+        Write-Host "[-] Python non detecte dans le PATH (introuvable)." -ForegroundColor Red
     }
 
     # Verification binaires Fastboot & ADB
@@ -60,8 +64,10 @@ function Check-Environment {
         Write-Host "[-] Binaires Fastboot/ADB manquants dans ..\bin" -ForegroundColor Red
     }
 
-    # Verification mtkclient
-    if (Test-Path $mtkPy) {
+    # Verification mtkclient & unlock_dandelion.py
+    if (Test-Path $unlockPy) {
+        Write-Host "[+] Script de contournement BROM/RPMB present : unlock_dandelion.py" -ForegroundColor Green
+    } elseif (Test-Path $mtkPy) {
         Write-Host "[+] Outil mtkclient officiel present dans ..\src\mtkclient" -ForegroundColor Green
     } else {
         Write-Host "[-] mtkclient introuvable dans ..\src\mtkclient" -ForegroundColor Red
@@ -75,11 +81,16 @@ function Check-Environment {
     }
 
     # Verification paquets ROM / Magisk
-    $romZips = Get-ChildItem -Path "$ScriptDir\roms" -Filter "*.zip" -ErrorAction SilentlyContinue
-    if (Test-Path $magiskApk) {
-        Write-Host "[+] Paquet Root Magisk v26.4 present dans .\roms" -ForegroundColor Green
+    $romZips = Get-ChildItem -Path "$ScriptDir\roms" -Filter "*.zip" -ErrorAction SilentlyContinue | Where-Object { $_.Name -notmatch "^Magisk" }
+    $magiskFound = $null
+    foreach ($m in @("$ScriptDir\roms\Magisk-v30.7.apk", "$ScriptDir\roms\Magisk-v30.7.zip", "$ScriptDir\roms\Magisk-v26.4.apk", "$ScriptDir\roms\Magisk-v26.4.zip")) {
+        if (Test-Path $m) { $magiskFound = Split-Path $m -Leaf; break }
+    }
+
+    if ($magiskFound) {
+        Write-Host "[+] Paquet Root Magisk detecte : $magiskFound" -ForegroundColor Green
     } else {
-        Write-Host "[!] Paquet Magisk-v26.4.apk absent de .\roms" -ForegroundColor Yellow
+        Write-Host "[!] Paquet Magisk absent de .\roms (Consultez README_ROMS.md)" -ForegroundColor Yellow
     }
 
     if ($romZips.Count -gt 0) {
@@ -113,14 +124,35 @@ function Install-UsbDk-Driver {
 }
 
 function Unlock-And-FRP {
+    <#
+    .SYNOPSIS
+        Mappe avec 0_DEVERROUILLER_BOOTLOADER_DANDELION.bat
+        Execute l'automatisation complete de deverrouillage BROM et contournement RPMB (unlock_dandelion.py)
+        Effectue 'da seccfg unlock' et le contournement de signature 'Jz8PNRUF'.
+    #>
     Write-Host "=================================================================" -ForegroundColor Yellow
-    Write-Host "  ACTION : DEVERROUILLAGE BOOTLOADER ^& BYPASS FRP (BROM MT6762G)" -ForegroundColor Yellow
+    Write-Host "  ACTION : DEVERROUILLAGE BOOTLOADER & BYPASS FRP (BROM MT6762G)" -ForegroundColor Yellow
+    Write-Host "  Script associe : 0_DEVERROUILLER_BOOTLOADER_DANDELION.bat     " -ForegroundColor Cyan
     Write-Host "=================================================================" -ForegroundColor Yellow
     Write-Host ""
     Write-Host "[!] REGLE CRITIQUE ANTI-BRICK :" -ForegroundColor Cyan
     Write-Host "    Ce script cible uniquement seccfg, frp et le formatage userdata." -ForegroundColor White
     Write-Host "    La partition PRELOADER (boot1/boot2) n'est JAMAIS modifiee." -ForegroundColor Yellow
     Write-Host ""
+
+    # Verification presence Python
+    try {
+        $null = & python --version 2>&1
+    } catch {
+        Write-Host "[-] Python introuvable dans le PATH. Veuillez installer Python 3." -ForegroundColor Red
+        return
+    }
+
+    if (-not (Test-Path $unlockPy) -and -not (Test-Path $mtkPy)) {
+        Write-Host "[-] Outil de deverrouillage introuvable (unlock_dandelion.py ou mtkclient manquant)." -ForegroundColor Red
+        return
+    }
+
     Write-Host "INSTRUCTIONS POUR LE REDMI 10A :" -ForegroundColor Cyan
     Write-Host "1. Debranchez le telephone du PC." -ForegroundColor White
     Write-Host "2. Eteignez completement le telephone (POWER 10-15s jusqu'a ecran noir)." -ForegroundColor White
@@ -130,21 +162,56 @@ function Unlock-And-FRP {
     Write-Host ""
     Read-Host "Appuyez sur Entree quand pret..."
 
-    Write-Host "[*] Interception du handshake BootROM en cours (session mtkclient multi)..." -ForegroundColor Yellow
-    & python "$mtkPy" multi "da seccfg lock;da seccfg unlock;e frp;e metadata,userdata,md_udc;reset"
+    if (Test-Path $unlockPy) {
+        Write-Host "[*] Lancement de unlock_dandelion.py (BROM + RPMB Magic Bypass)..." -ForegroundColor Yellow
+        & python "$unlockPy"
+        $exitCode = $LASTEXITCODE
 
-    if ($LASTEXITCODE -eq 0) {
-        Write-Host "[+] Operation terminee avec succes ! Bootloader deverrouille et FRP efface." -ForegroundColor Green
+        # Sous Windows, la deconnexion materielle USB lors du reset DA renvoie souvent ces codes
+        if ($exitCode -eq -1073741819 -or $exitCode -eq 3221225477) {
+            $exitCode = 0
+        }
+
+        if ($exitCode -eq 0) {
+            Write-Host "[+] Operation terminee avec succes ! Bootloader deverrouille et FRP efface." -ForegroundColor Green
+        } else {
+            Write-Host "[-] ERREUR : Echec de l'operation de deverrouillage (code $exitCode)." -ForegroundColor Red
+        }
     } else {
-        Write-Host "[-] ERREUR : Echec mtkclient (code $LASTEXITCODE). Verifiez le pilote UsbDk et le port USB." -ForegroundColor Red
+        Write-Host "[*] Interception du handshake BootROM en cours (session mtkclient multi)..." -ForegroundColor Yellow
+        # Pipeline de secours : da seccfg unlock
+        & python "$mtkPy" multi "da seccfg lock;da seccfg unlock;e frp;e metadata,userdata,md_udc;reset"
+
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "[+] Operation terminee avec succes ! Bootloader deverrouille et FRP efface." -ForegroundColor Green
+        } else {
+            Write-Host "[-] ERREUR : Echec mtkclient (code $LASTEXITCODE). Verifiez le pilote UsbDk et le port USB." -ForegroundColor Red
+        }
     }
 }
 
 function Flash-Recovery-Fastboot {
+    <#
+    .SYNOPSIS
+        Mappe avec 1_FLASHER_RECOVERY_ET_VBMETA.bat
+        Flashe vbmeta (AVB 2.0 bypass), noyau certifie (boot/dtbo) et recovery.img
+    #>
     Write-Host "=================================================================" -ForegroundColor Yellow
-    Write-Host "  ACTION : FLASH CUSTOM RECOVERY ^& DESACTIVATION AVB (FASTBOOT)  " -ForegroundColor Yellow
+    Write-Host "  ACTION : FLASH CUSTOM RECOVERY & DESACTIVATION AVB (FASTBOOT)  " -ForegroundColor Yellow
+    Write-Host "  Script associe : 1_FLASHER_RECOVERY_ET_VBMETA.bat             " -ForegroundColor Cyan
     Write-Host "=================================================================" -ForegroundColor Yellow
     Write-Host ""
+
+    if (-not (Test-Path $fastbootExe)) {
+        Write-Host "[-] Binaire Fastboot manquant : $fastbootExe introuvable." -ForegroundColor Red
+        return
+    }
+
+    if (-not (Test-Path $recImg) -or -not (Test-Path $vbmetaImg)) {
+        Write-Host "[-] Fichier recovery.img ou vbmeta.img manquant dans .\recovery." -ForegroundColor Red
+        return
+    }
+
     Write-Host "INSTRUCTIONS POUR LE MODE FASTBOOT :" -ForegroundColor Cyan
     Write-Host "1. Eteignez le telephone." -ForegroundColor White
     Write-Host "2. Maintenez [VOLUME BAS] + [POWER] jusqu'a l'affichage de FASTBOOT." -ForegroundColor White
@@ -167,7 +234,21 @@ function Flash-Recovery-Fastboot {
     Write-Host "[+] Peripherique Fastboot detecte :" -ForegroundColor Green
     Write-Host "    $fbDevices" -ForegroundColor Cyan
 
-    Write-Host "[*] Flash de vbmeta.img avec desactivation AVB 2.0 (dm-verity)..." -ForegroundColor Yellow
+    # Verification de securite du produit (dandelion / blossom)
+    $prodRaw = & "$fastbootExe" getvar product 2>&1
+    $prodStr = ($prodRaw | Out-String).Trim()
+    if ($prodStr -match "product\s*:\s*(\w+)") {
+        $prodName = $matches[1]
+        Write-Host "    Modele detecte : $prodName" -ForegroundColor White
+        if ($prodName -ne "dandelion" -and $prodName -ne "blossom") {
+            Write-Host "[!] AVERTISSEMENT : Le peripherique detecte [$prodName] ne correspond pas a dandelion/blossom !" -ForegroundColor Yellow
+            Write-Host "    Flash annule pour proteger l'appareil contre un mauvais micrologiciel." -ForegroundColor Red
+            return
+        }
+    }
+
+    Write-Host ""
+    Write-Host "[*] Etape 1/3 : Flash de vbmeta.img avec desactivation AVB 2.0 (dm-verity)..." -ForegroundColor Yellow
     & "$fastbootExe" --disable-verity --disable-verification flash vbmeta "$vbmetaImg"
     if ($LASTEXITCODE -ne 0) {
         Write-Host "[-] ERREUR lors du flash de VBMeta (code $LASTEXITCODE)." -ForegroundColor Red
@@ -175,7 +256,29 @@ function Flash-Recovery-Fastboot {
     }
     Write-Host "[+] VBMeta flashe et AVB neutralise avec succes !" -ForegroundColor Green
 
-    Write-Host "[*] Flash du Custom Recovery ($recImg)..." -ForegroundColor Yellow
+    # Flash des partitions vbmeta secondaires si presentes
+    if (Test-Path $vbmetaSysImg) {
+        Write-Host "[*] Flash de vbmeta_system..." -ForegroundColor Yellow
+        & "$fastbootExe" flash vbmeta_system "$vbmetaSysImg"
+    }
+    if (Test-Path $vbmetaVenImg) {
+        Write-Host "[*] Flash de vbmeta_vendor..." -ForegroundColor Yellow
+        & "$fastbootExe" flash vbmeta_vendor "$vbmetaVenImg"
+    }
+
+    # Etape 2 : Flash du noyau et dtbo si presents (indispensable crDroid/ROM 64-bit)
+    if (Test-Path $bootImg) {
+        Write-Host ""
+        Write-Host "[*] Etape 2/3 : Flash du noyau certifie (boot.img & dtbo.img)..." -ForegroundColor Yellow
+        & "$fastbootExe" flash boot "$bootImg"
+        if (Test-Path $dtboImg) {
+            & "$fastbootExe" flash dtbo "$dtboImg"
+        }
+        Write-Host "[+] Noyau et DTBO synchronises avec succes !" -ForegroundColor Green
+    }
+
+    Write-Host ""
+    Write-Host "[*] Etape 3/3 : Flash du Custom Recovery ($recImg)..." -ForegroundColor Yellow
     & "$fastbootExe" flash recovery "$recImg"
     if ($LASTEXITCODE -ne 0) {
         Write-Host "[-] ERREUR lors du flash du Recovery (code $LASTEXITCODE)." -ForegroundColor Red
@@ -183,59 +286,121 @@ function Flash-Recovery-Fastboot {
     }
     Write-Host "[+] Custom Recovery flashe avec succes !" -ForegroundColor Green
 
+    Write-Host ""
     Write-Host "[*] Redemarrage direct vers le Custom Recovery..." -ForegroundColor Yellow
     Write-Host "[!] Maintenez [VOLUME HAUT] des extinction pour eviter l'ecrasement par MIUI !" -ForegroundColor Cyan
     & "$fastbootExe" reboot recovery
-    Write-Host "[+] Commande de reboot executee. Le telephone demarre en recovery." -ForegroundColor Green
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "[-] ERREUR lors du redemarrage en recovery (code $LASTEXITCODE)." -ForegroundColor Red
+    } else {
+        Write-Host "[+] Commande de reboot executee. Le telephone demarre en recovery." -ForegroundColor Green
+    }
 }
 
 function Push-ROM-Files-ADB {
-    # Mappe avec 2_INSTALLER_ROM_64BIT_ET_ROOT.bat (workflow adb push / sideload)
+    <#
+    .SYNOPSIS
+        Mappe avec 2_INSTALLER_ROM_64BIT_ET_ROOT.bat (workflow adb sideload / push)
+    #>
     Write-Host "=================================================================" -ForegroundColor Yellow
     Write-Host "  ACTION : DEPLOIEMENT DE LA CUSTOM ROM 64-BIT ET DE MAGISK      " -ForegroundColor Yellow
+    Write-Host "  Script associe : 2_INSTALLER_ROM_64BIT_ET_ROOT.bat            " -ForegroundColor Cyan
     Write-Host "=================================================================" -ForegroundColor Yellow
     Write-Host ""
-    Write-Host "INSTRUCTIONS DANS LE CUSTOM RECOVERY (OrangeFox / TWRP) :" -ForegroundColor Cyan
-    Write-Host "1. Sur le telephone, verifiez la connexion USB." -ForegroundColor White
-    Write-Host "2. Si la detection echoue, allez dans 'Mount' > 'Disable MTP' puis 'Enable MTP'." -ForegroundColor White
+
+    if (-not (Test-Path $adbExe)) {
+        Write-Host "[-] Binaire ADB manquant : $adbExe introuvable." -ForegroundColor Red
+        return
+    }
+
+    Write-Host "INSTRUCTIONS DANS LE RECOVERY CRDROID :" -ForegroundColor Cyan
+    Write-Host "1. Formatage prealable (si transition stock) : 'Factory reset' > 'Format data / factory reset'." -ForegroundColor White
+    Write-Host "2. Passage en mode Sideload : 'Apply update' > 'Apply from ADB'." -ForegroundColor White
+    Write-Host "3. Reliez le cable USB au PC." -ForegroundColor White
     Write-Host ""
     Read-Host "Appuyez sur Entree pour verifier la liaison ADB..."
 
     & "$adbExe" devices
+    $adbStateRaw = & "$adbExe" get-state 2>&1
+    $adbState = ($adbStateRaw | Out-String).Trim()
+    Write-Host "[+] Etat de la connexion ADB detecte : $adbState" -ForegroundColor Green
+    Write-Host ""
 
     # Recherche et envoi des ROMs
-    $romFiles = Get-ChildItem -Path "$ScriptDir\roms" -Filter "*.zip" -ErrorAction SilentlyContinue
+    $romFiles = Get-ChildItem -Path "$ScriptDir\roms" -Filter "*.zip" -ErrorAction SilentlyContinue | Where-Object { $_.Name -notmatch "^Magisk" }
+    if ($romFiles.Count -eq 0) {
+        Write-Host "[!] Aucune archive ROM .zip detectee dans .\roms\." -ForegroundColor Yellow
+        Write-Host "    Consultez .\roms\README_ROMS.md pour telecharger crDroid ou LineageOS." -ForegroundColor Gray
+    }
     foreach ($file in $romFiles) {
-        Write-Host "[*] Envoi de $($file.Name) vers /sdcard/ ..." -ForegroundColor Yellow
-        & "$adbExe" push "$($file.FullName)" /sdcard/
-        if ($LASTEXITCODE -ne 0) {
-            Write-Host "[-] Avertissement lors de la copie de $($file.Name)." -ForegroundColor Red
+        if ($adbState -eq "sideload") {
+            Write-Host "[*] Transfert de la ROM $($file.Name) via ADB Sideload..." -ForegroundColor Yellow
+            & "$adbExe" sideload "$($file.FullName)"
+            if ($LASTEXITCODE -ne 0) {
+                Write-Host "[-] Echec lors du sideload de $($file.Name) (code $LASTEXITCODE)." -ForegroundColor Red
+            } else {
+                Write-Host "[+] Installation de $($file.Name) terminee avec succes !" -ForegroundColor Green
+            }
         } else {
-            Write-Host "[+] Copie terminee : $($file.Name)" -ForegroundColor Green
+            Write-Host "[*] Envoi de $($file.Name) vers /sdcard/ via ADB Push..." -ForegroundColor Yellow
+            & "$adbExe" push "$($file.FullName)" /sdcard/
+            if ($LASTEXITCODE -ne 0) {
+                Write-Host "[-] La copie Push n'a pas pu aboutir. Activez 'Apply update' > 'Apply from ADB'." -ForegroundColor Red
+            } else {
+                Write-Host "[+] Copie terminee : $($file.Name)" -ForegroundColor Green
+            }
         }
     }
 
-    # Envoi de Magisk pour le root
-    if (Test-Path $magiskApk) {
-        Write-Host "[*] Envoi de Magisk v26.4 vers /sdcard/Magisk-v26.4.zip ..." -ForegroundColor Yellow
-        & "$adbExe" push "$magiskApk" /sdcard/Magisk-v26.4.zip
-        if ($LASTEXITCODE -eq 0) {
-            Write-Host "[+] Magisk-v26.4.zip pret pour installation dans le recovery !" -ForegroundColor Green
+    # Envoi de Magisk pour le root (detection dynamique v30.7 ou v26.4)
+    $magiskCandidate = $null
+    $magiskCandidates = @(
+        "$ScriptDir\roms\Magisk-v30.7.zip",
+        "$ScriptDir\roms\Magisk-v30.7.apk",
+        "$ScriptDir\roms\Magisk-v26.4.apk",
+        "$ScriptDir\roms\Magisk-v26.4.zip"
+    )
+    foreach ($mc in $magiskCandidates) {
+        if (Test-Path $mc) {
+            $magiskCandidate = $mc
+            break
+        }
+    }
+
+    if ($magiskCandidate) {
+        $magiskBaseName = Split-Path $magiskCandidate -Leaf
+        if ($adbState -eq "sideload") {
+            Write-Host ""
+            $flashMagiskChoice = Read-Host "Souhaitez-vous flasher $magiskBaseName (Root) maintenant via Sideload ? (O/N)"
+            if ($flashMagiskChoice -match "^[oOyY]") {
+                Write-Host "[*] Transfert de $magiskBaseName via ADB Sideload..." -ForegroundColor Yellow
+                & "$adbExe" sideload "$magiskCandidate"
+                if ($LASTEXITCODE -eq 0) {
+                    Write-Host "[+] Magisk injecte avec succes !" -ForegroundColor Green
+                } else {
+                    Write-Host "[-] Avertissement flash Magisk (code $LASTEXITCODE)." -ForegroundColor Yellow
+                }
+            }
         } else {
-            Write-Host "[-] ERREUR lors de l'envoi de Magisk-v26.4.apk (code $LASTEXITCODE)." -ForegroundColor Red
+            Write-Host "[*] Envoi de $magiskBaseName vers /sdcard/Magisk.zip ..." -ForegroundColor Yellow
+            & "$adbExe" push "$magiskCandidate" /sdcard/Magisk.zip
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "[+] Magisk.zip pret pour installation dans le recovery !" -ForegroundColor Green
+            } else {
+                Write-Host "[-] ERREUR lors de l'envoi de Magisk (code $LASTEXITCODE)." -ForegroundColor Red
+            }
         }
     } else {
-        Write-Host "[-] Fichier Magisk introuvable : $magiskApk" -ForegroundColor Red
+        Write-Host "[-] Fichier Magisk introuvable dans .\roms (Magisk-v30.7 ou v26.4 manquant)." -ForegroundColor Red
     }
 
     Write-Host ""
     Write-Host "=================================================================" -ForegroundColor Green
     Write-Host "  ETAPES FINALES A REALISER DANS LE RECOVERY :                  " -ForegroundColor Green
     Write-Host "=================================================================" -ForegroundColor Green
-    Write-Host "  1. Wipe     : 'Format Data' > taper 'yes' (Obligatoire transition stock)" -ForegroundColor Yellow
-    Write-Host "  2. Install  : Flasher le fichier .zip de la Custom ROM 64-bit" -ForegroundColor White
-    Write-Host "  3. Install  : Flasher '/sdcard/Magisk-v26.4.zip' pour le root 64-bit" -ForegroundColor White
-    Write-Host "  4. Reboot   : System (Premier boot : 2 a 3 minutes)" -ForegroundColor Green
+    Write-Host "  1. Wipe     : 'Factory reset' > 'Format data / factory reset' (Anti-bootloop)" -ForegroundColor Yellow
+    Write-Host "  2. Magisk   : Si demande 'Signature verification failed. Install anyway?' -> 'Yes'" -ForegroundColor White
+    Write-Host "  3. Reboot   : 'Reboot system now' (Premier boot : 2 a 3 minutes)" -ForegroundColor Green
     Write-Host "=================================================================" -ForegroundColor Green
 }
 

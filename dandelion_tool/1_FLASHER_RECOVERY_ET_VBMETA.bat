@@ -61,11 +61,11 @@ echo Appuyez sur une touche pour lancer le flash de VBMeta et du Recovery...
 pause >nul
 echo.
 
-echo [*] Etape 1/3 : Desactivation de la verification AVB 2.0 (VBMeta)...
+echo [*] Etape 1/3 : Desactivation de la verification AVB 2.0 - VBMeta...
 "%~dp0..\bin\fastboot.exe" --disable-verity --disable-verification flash vbmeta "%~dp0recovery\vbmeta.img"
 if %errorlevel% neq 0 (
     echo.
-    echo [-] ERREUR lors du flash de vbmeta.img (code %errorlevel%).
+    echo [-] ERREUR lors du flash de vbmeta.img - code %errorlevel%.
     echo     Verifiez que le bootloader est deverrouille et que le telephone est en mode Fastboot.
     pause
     exit /b %errorlevel%
@@ -82,20 +82,20 @@ echo [+] VBMeta et partitions AVB flashees avec succes !
 echo.
 
 if exist "%~dp0recovery\boot.img" (
-    echo [*] Etape 2/3 : Flash du noyau certifie (boot.img ^& dtbo.img)...
+    echo [*] Etape 2/3 : Flash du noyau certifie - boot.img et dtbo.img...
     "%~dp0..\bin\fastboot.exe" flash boot "%~dp0recovery\boot.img"
-    if exist "%~dp0recovery\dtbo.img" (
-        "%~dp0..\bin\fastboot.exe" flash dtbo "%~dp0recovery\dtbo.img"
-    )
+)
+if exist "%~dp0recovery\dtbo.img" (
+    "%~dp0..\bin\fastboot.exe" flash dtbo "%~dp0recovery\dtbo.img"
     echo [+] Noyau et DTBO synchronises avec succes !
     echo.
 )
 
-echo [*] Etape 3/3 : Flash du Custom Recovery (recovery.img)...
+echo [*] Etape 3/3 : Flash du Custom Recovery - recovery.img...
 "%~dp0..\bin\fastboot.exe" flash recovery "%~dp0recovery\recovery.img"
 if %errorlevel% neq 0 (
     echo.
-    echo [-] ERREUR lors du flash de recovery.img (code %errorlevel%).
+    echo [-] ERREUR lors du flash de recovery.img - code %errorlevel%.
     pause
     exit /b %errorlevel%
 )

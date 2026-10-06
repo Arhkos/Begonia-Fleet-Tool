@@ -71,11 +71,11 @@ if "%EXIT_CODE%"=="3221225477" set EXIT_CODE=0
 if %EXIT_CODE% neq 0 (
     echo.
     echo =====================================================================
-    echo [-] ERREUR : L'operation mtkclient a rencontre une difficulte (code %EXIT_CODE%).
+    echo [-] ERREUR : L'operation mtkclient a rencontre une difficulte - code %EXIT_CODE%.
     echo.
     echo Pistes de resolution :
-    echo - Assurez-vous d'avoir branche le telephone sur un port USB 2.0 (noir).
-    echo - Verifiez que le pilote UsbDk est actif (..\drivers\UsbDk_1.0.22_x64.msi).
+    echo - Assurez-vous d'avoir branche le telephone sur un port USB 2.0.
+    echo - Verifiez que le pilote UsbDk est actif : ..\drivers\UsbDk_1.0.22_x64.msi.
     echo - Recommencez la manipulation : extinction complete, Vol+ et Vol- maintenus.
     echo =====================================================================
 ) else (
